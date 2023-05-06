@@ -17,11 +17,13 @@ namespace Login.Service.AuthService
         private readonly DataContext _context;
         private readonly IConfiguration _configuration;
         private readonly IMapper _mapper;
-        public AuthService(DataContext context, IConfiguration configuration, IMapper mapper)
+        private readonly IHttpContextAccessor _httpContext;
+        public AuthService(DataContext context, IConfiguration configuration, IMapper mapper, IHttpContextAccessor httpContext)
         {
             _context = context;
             _configuration = configuration;
             _mapper = mapper;
+            _httpContext = httpContext;
         }
 
         public ServiceResponse<string> Login(LoginUserDto request)
@@ -69,9 +71,24 @@ namespace Login.Service.AuthService
             response.Data = _mapper.Map<GetUserDto>(user);
             return response;
         }
-        public ServiceResponse<string> ResetPasword(string currentPassword)
+        public ServiceResponse<GetUserDto> ResetPasword(ResetUserPasswordDto request)
         {
-            throw new NotImplementedException();
+            var response = new ServiceResponse<GetUserDto>();
+            var userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = _context.Users.FirstOrDefault(u => u.Id == userId);
+            if(VerifyPassword(request.currentPassword, user.PasswordHash, user.PasswordSalt))
+            {
+                CreatePasswordHash(request.NewPassword, out byte[] passwordHash, out byte[] passwrodSalt);
+                user.PasswordHash = passwordHash;
+                user.PasswordSalt = passwrodSalt;
+                _context.SaveChanges();
+                response.Message = "You have changed you password";
+                response.Data = _mapper.Map<GetUserDto>(user);
+                return response;
+            }
+            response.Success = false;
+            response.Message = "Please insert your old password to confirm identity n shit lol";
+            return response;
         }
         public bool UserExists(string username)
         {

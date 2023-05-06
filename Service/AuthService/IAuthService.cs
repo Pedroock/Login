@@ -11,7 +11,7 @@ namespace Login.Service.AuthService
     {
         ServiceResponse<string> Login(LoginUserDto request);
         ServiceResponse<GetUserDto> Register(RegisterUserDto request);
-        ServiceResponse<string> ResetPasword(string currentPassword);
+        ServiceResponse<GetUserDto> ResetPasword(ResetUserPasswordDto request);
         bool UserExists(string username);
         void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt);
         bool VerifyPassword(string password, byte[] passwordHash, byte[] passwordSalt);
