@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Login.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Login.Data
@@ -12,5 +13,6 @@ namespace Login.Data
         {
         }
         //public DbSet<Model> Models => Set<Model>();
+        public DbSet<User> Users => Set<User>();
     }
 }
