@@ -13,5 +13,7 @@ namespace Login.Models
         public byte[] PasswordHash {get;set;} = new byte[0];
         public byte[] PasswordSalt {get;set;} = new byte[0];
         public string Role { get; set; } = string.Empty;
+        public string ValidationCode { get; set; } = string.Empty;
+        public bool IsValidated { get; set; } = false;
     }
 }

@@ -41,11 +41,32 @@ namespace Login.Controllers
             }
             return Ok(response);
         }
+
         [Authorize]
         [HttpPost("Reset Password")]
         public ActionResult<ServiceResponse<GetUserDto>> ResetPassword(ResetUserPasswordDto request)
         {
             var response = _authService.ResetPasword(request);
+            if(!response.Success)
+            {
+                return BadRequest(response);
+            }
+            return Ok(response);
+        }
+
+        [Authorize]
+        [HttpPost("Send Validation Email")]
+        public async Task<ActionResult> SendValidationEmail()
+        {
+            await _authService.SendValidationEmail();
+            return Ok();
+        }
+
+        [Authorize]
+        [HttpPost("Enter Validation Code")]
+        public ActionResult<ServiceResponse<GetUserDto>> EnterValidationCode(string code)
+        {
+            var response = _authService.EnterValidationCode(code);
             if(!response.Success)
             {
                 return BadRequest(response);

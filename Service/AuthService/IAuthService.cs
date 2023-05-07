@@ -13,8 +13,12 @@ namespace Login.Service.AuthService
         ServiceResponse<GetUserDto> Register(RegisterUserDto request);
         ServiceResponse<GetUserDto> ResetPasword(ResetUserPasswordDto request);
         bool UserExists(string username);
+        bool EmailExists(string email);
         void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt);
         bool VerifyPassword(string password, byte[] passwordHash, byte[] passwordSalt);
         string CreateToken(User user);
+        string  CreateRandomCode();
+        Task SendValidationEmail();
+        ServiceResponse<GetUserDto> EnterValidationCode(string code);
     }
 }

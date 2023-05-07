@@ -9,6 +9,8 @@ using Login.Dtos.User;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
+using System.Net;
+using System.Net.Mail;
 
 namespace Login.Service.AuthService
 {
@@ -56,14 +58,20 @@ namespace Login.Service.AuthService
                 response.Message = "User Already Exists";
                 return response;
             }
+            if(EmailExists(request.Email))
+            {
+                response.Success = false;
+                response.Message = "Email Already In Use";
+                return response;
+            }
             CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwrodSalt);
             var user = new User
             {
                 Username = request.Username,
                 Role = request.Role,
                 PasswordHash = passwordHash,
-                PasswordSalt = passwrodSalt
-                // email
+                PasswordSalt = passwrodSalt,
+                Email = request.Email
             };
             _context.Users.Add(user);
             _context.SaveChanges();
@@ -74,7 +82,7 @@ namespace Login.Service.AuthService
         public ServiceResponse<GetUserDto> ResetPasword(ResetUserPasswordDto request)
         {
             var response = new ServiceResponse<GetUserDto>();
-            var userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            int userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var user = _context.Users.FirstOrDefault(u => u.Id == userId);
             if(VerifyPassword(request.currentPassword, user.PasswordHash, user.PasswordSalt))
             {
@@ -93,6 +101,16 @@ namespace Login.Service.AuthService
         public bool UserExists(string username)
         {
             var user = _context.Users.FirstOrDefault(u => u.Username.ToLower() == username.ToLower());
+            if(user is null)
+            {
+                return false;
+            }
+            return true;
+        }
+
+        public bool EmailExists(string email)
+        {
+            var user = _context.Users.FirstOrDefault(u => u.Email == email);
             if(user is null)
             {
                 return false;
@@ -143,6 +161,54 @@ namespace Login.Service.AuthService
             JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
             SecurityToken token = tokenHandler.CreateToken(tokenDescriptor);
             return tokenHandler.WriteToken(token);
+        }
+        public string CreateRandomCode()
+        {
+            Random r = new Random();
+            int randomInt = r.Next(1000000);
+            string code = randomInt.ToString("D6");
+            return code;
+        }
+
+        public Task SendValidationEmail()
+        {
+            int userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = _context.Users.FirstOrDefault(u => u.Id == userId);
+            string code = CreateRandomCode();
+            user!.ValidationCode = code;
+            _context.SaveChanges();
+            string receiver = user!.Email;
+            string subject = "Email validation code";
+            string message = $"Insert the code {code} to validate your email";
+            var client = new SmtpClient("smtp.office365.com", 587)
+            {
+                EnableSsl = true,
+                UseDefaultCredentials = false,
+                Credentials = new NetworkCredential("pedroarthurcosta@hotmail.com", "bmnsslihacpmasbc")
+            };
+            return client.SendMailAsync( new MailMessage(
+                from: "pedroarthurcosta@hotmail.com",
+                to: receiver,
+                subject,
+                message
+            ));
+        }
+
+        public ServiceResponse<GetUserDto> EnterValidationCode(string code)
+        {
+            var response = new ServiceResponse<GetUserDto>();
+            int userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = _context.Users.FirstOrDefault(u => u.Id == userId);
+            if(code == user!.ValidationCode)
+            {
+                user.IsValidated = true;
+                response.Message = "Your email has been validated";
+                response.Data = _mapper.Map<GetUserDto>(user);
+                return response;
+            }
+            response.Message = "This is the wrong code";
+            response.Success = false;
+            return response;
         }
     }
 }
