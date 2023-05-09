@@ -11,6 +11,7 @@ using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 using System.Net;
 using System.Net.Mail;
+using System.Text.RegularExpressions;
 
 namespace Login.Service.AuthService
 {
@@ -64,14 +65,20 @@ namespace Login.Service.AuthService
                 response.Message = "Email Already In Use";
                 return response;
             }
+            if(!EmailIsValid(request.Email))
+            {
+                response.Success = false;
+                response.Message = "Email is not valid";
+                return response;
+            }
             CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwrodSalt);
             var user = new User
             {
-                Username = request.Username,
+                Username = request.Username.Trim(),
                 Role = request.Role,
                 PasswordHash = passwordHash,
                 PasswordSalt = passwrodSalt,
-                Email = request.Email
+                Email = request.Email.Trim()
             };
             _context.Users.Add(user);
             _context.SaveChanges();
@@ -79,6 +86,7 @@ namespace Login.Service.AuthService
             response.Data = _mapper.Map<GetUserDto>(user);
             return response;
         }
+
         public ServiceResponse<GetUserDto> ResetPasword(ResetUserPasswordDto request)
         {
             var response = new ServiceResponse<GetUserDto>();
@@ -98,6 +106,7 @@ namespace Login.Service.AuthService
             response.Message = "Please insert your old password to confirm identity n shit lol";
             return response;
         }
+
         public bool UserExists(string username)
         {
             var user = _context.Users.FirstOrDefault(u => u.Username.ToLower() == username.ToLower());
@@ -116,6 +125,13 @@ namespace Login.Service.AuthService
                 return false;
             }
             return true;
+        }
+
+        public bool EmailIsValid(string email)
+        {
+            string pattern = @"^(?!\.)(""([^""\r\\]|\\[""\r\\])*""|" + @"([-a-z0-9!#$%&'*+/=?^_`{|}~]|(?<!\.)\.)*)(?<!\.)" + @"@[a-z0-9][\w\.-]*[a-z0-9]\.[a-z][a-z\.]*[a-z]$";    
+            var regex = new Regex(pattern, RegexOptions.IgnoreCase);    
+            return regex.IsMatch(email);
         }
 
         public void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
