@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Net;
 using System.Net.Mail;
 using System.Text.RegularExpressions;
+using System.Security.Cryptography;
 
 namespace Login.Service.AuthService
 {
@@ -42,11 +43,11 @@ namespace Login.Service.AuthService
         // big boios
         public ServiceResponse<string> Login(LoginUserDto request)
         {
-            var response = new ServiceResponse<string>();
-            var user = _context.Users.FirstOrDefault(u => u.Username == request.UsernameOrEmail);
+            ServiceResponse<string> response = new ServiceResponse<string>();
+            User user = _context.Users.FirstOrDefault(u => u.Username == request.UsernameOrEmail)!;
             if(user is null)
             {
-                user = _context.Users.FirstOrDefault(u => u.Email == request.UsernameOrEmail);
+                user = _context.Users.FirstOrDefault(u => u.Email == request.UsernameOrEmail)!;
                 if(user is null)
                 {
                     response.Success = false;
@@ -67,7 +68,7 @@ namespace Login.Service.AuthService
 
         public ServiceResponse<GetUserDto> Register(RegisterUserDto request)
         {
-            var response = new ServiceResponse<GetUserDto>();
+            ServiceResponse<GetUserDto> response = new ServiceResponse<GetUserDto>();
             if(UserExists(request.Username))
             {
                 response.Success = false;
@@ -94,7 +95,7 @@ namespace Login.Service.AuthService
                 return response;
             }
             CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwrodSalt);
-            var user = new User
+            User user = new User
             {
                 Username = request.Username.Trim(),
                 Role = request.Role,
@@ -111,8 +112,8 @@ namespace Login.Service.AuthService
 
         public ServiceResponse<GetUserDto> ResetPasword(ResetUserPasswordDto request)
         {
-            var response = new ServiceResponse<GetUserDto>();
-            var user = GetCurrentUser();
+            ServiceResponse<GetUserDto> response = new ServiceResponse<GetUserDto>();
+            User user = GetCurrentUser();
             if(VerifyPassword(request.currentPassword, user!.PasswordHash, user.PasswordSalt))
             {
                 CreatePasswordHash(request.NewPassword, out byte[] passwordHash, out byte[] passwrodSalt);
@@ -154,14 +155,14 @@ namespace Login.Service.AuthService
 
         public Task SendValidationEmail()
         {
-            var user = GetCurrentUser();
+            User user = GetCurrentUser();
             string code = CreateRandomCode();
             user!.ValidationCode = code;
             _context.SaveChanges();
             string receiver = user!.Email;
             string subject = "Email validation code";
             string message = $"Insert the code {code} to validate your email";
-            var client = new SmtpClient("smtp.office365.com", 587)
+            SmtpClient client = new SmtpClient("smtp.office365.com", 587)
             {
                 EnableSsl = true,
                 UseDefaultCredentials = false,
@@ -177,8 +178,8 @@ namespace Login.Service.AuthService
 
         public ServiceResponse<GetUserDto> EnterValidationCode(string code)
         {
-            var response = new ServiceResponse<GetUserDto>();
-            var user = GetCurrentUser();
+            ServiceResponse<GetUserDto> response = new ServiceResponse<GetUserDto>();
+            User user = GetCurrentUser();
             if(code == user!.ValidationCode)
             {
                 user.IsValidated = true;
@@ -195,7 +196,7 @@ namespace Login.Service.AuthService
         // suporte boios
         public bool UserExists(string username)
         {
-            var user = _context.Users.FirstOrDefault(u => u.Username.ToLower() == username.ToLower());
+            User user = _context.Users.FirstOrDefault(u => u.Username.ToLower() == username.ToLower())!;
             if(user is null)
             {
                 return false;
@@ -205,7 +206,7 @@ namespace Login.Service.AuthService
 
         public bool EmailExists(string email)
         {
-            var user = _context.Users.FirstOrDefault(u => u.Email == email);
+            User user = _context.Users.FirstOrDefault(u => u.Email == email)!;
             if(user is null)
             {
                 return false;
@@ -216,13 +217,13 @@ namespace Login.Service.AuthService
         public bool EmailIsValid(string email)
         {
             string pattern = @"^(?!\.)(""([^""\r\\]|\\[""\r\\])*""|" + @"([-a-z0-9!#$%&'*+/=?^_`{|}~]|(?<!\.)\.)*)(?<!\.)" + @"@[a-z0-9][\w\.-]*[a-z0-9]\.[a-z][a-z\.]*[a-z]$";    
-            var regex = new Regex(pattern, RegexOptions.IgnoreCase);    
+            Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);    
             return regex.IsMatch(email);
         }
 
         public VoidServiceResponse PasswordIsValid(string password)
         {
-            var response = new VoidServiceResponse();
+            VoidServiceResponse response = new VoidServiceResponse();
             response.Message = "Invalid password. Your password must have letters, have numbers, be at least 8 characters long and not have any special characters. ";
             if(password.Length < 8)
             {
@@ -254,7 +255,7 @@ namespace Login.Service.AuthService
 
         public void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
         {
-            using (var hmac = new System.Security.Cryptography.HMACSHA512())
+            using (HMACSHA512 hmac = new HMACSHA512())
             {
                 passwordSalt = hmac.Key;
                 passwordHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
@@ -263,22 +264,22 @@ namespace Login.Service.AuthService
 
         public bool VerifyPassword(string password, byte[] dbPasswordHash, byte[] passwordSalt)
         {
-            using (var hmac = new System.Security.Cryptography.HMACSHA512(passwordSalt))
+            using (HMACSHA512 hmac = new HMACSHA512(passwordSalt))
             {
-                var hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
+                byte[] hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
                 return hash.SequenceEqual(dbPasswordHash);
             }
         }
 
         public string CreateToken(User user)
         {
-            var claims = new List<Claim>
+            List<Claim> claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
                 new Claim(ClaimTypes.Role, user.Role)
             };
-            var appSettingsPassword = _configuration.GetSection("AppSettings:Token").Value;
+            string appSettingsPassword = _configuration.GetSection("AppSettings:Token").Value!;
             if (appSettingsPassword is null)
             {
                 throw new Exception("AppSettingsPassword wasn't found");
@@ -286,7 +287,7 @@ namespace Login.Service.AuthService
             SymmetricSecurityKey key = new SymmetricSecurityKey(
                 System.Text.Encoding.UTF8.GetBytes(appSettingsPassword));
             SigningCredentials creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
-            var tokenDescriptor = new SecurityTokenDescriptor
+            SecurityTokenDescriptor tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
                 Expires = DateTime.Now.AddDays(1),

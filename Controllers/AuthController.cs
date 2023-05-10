@@ -23,7 +23,7 @@ namespace Login.Controllers
         [HttpPost("Register")]
         public ActionResult<ServiceResponse<GetUserDto>> Register(RegisterUserDto request)
         {
-            var response = (_authService.Register(request));
+            ServiceResponse<GetUserDto> response = _authService.Register(request);
             if(!response.Success)
             {
                 return BadRequest(response);
@@ -34,7 +34,7 @@ namespace Login.Controllers
         [HttpPost("Login")]
         public ActionResult<ServiceResponse<string>> Login(LoginUserDto request)
         {
-            var response = (_authService.Login(request));
+            ServiceResponse<string> response = _authService.Login(request);
             if(!response.Success)
             {
                 return BadRequest(response);
@@ -46,7 +46,7 @@ namespace Login.Controllers
         [HttpPost("Reset Password")]
         public ActionResult<ServiceResponse<GetUserDto>> ResetPassword(ResetUserPasswordDto request)
         {
-            var response = _authService.ResetPasword(request);
+            ServiceResponse<GetUserDto> response = _authService.ResetPasword(request);
             if(!response.Success)
             {
                 return BadRequest(response);
@@ -58,7 +58,7 @@ namespace Login.Controllers
         [HttpPost("Reset Email")]
         public ActionResult<ServiceResponse<GetUserDto>> ResetEmail(string email)
         {
-            var response = _authService.ResetEmail(email);
+            ServiceResponse<GetUserDto> response = _authService.ResetEmail(email);
             if(!response.Success)
             {
                 return BadRequest(response);
@@ -78,7 +78,7 @@ namespace Login.Controllers
         [HttpPost("Enter Validation Code")]
         public ActionResult<ServiceResponse<GetUserDto>> EnterValidationCode(string code)
         {
-            var response = _authService.EnterValidationCode(code);
+            ServiceResponse<GetUserDto> response = _authService.EnterValidationCode(code);
             if(!response.Success)
             {
                 return BadRequest(response);
