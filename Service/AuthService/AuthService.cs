@@ -28,16 +28,31 @@ namespace Login.Service.AuthService
             _mapper = mapper;
             _httpContext = httpContext;
         }
-        // big boy
+        // needed
+        private int GetCurrentUserId() 
+        {
+            return int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        }
+
+        private User GetCurrentUser() 
+        {
+            return _context.Users.FirstOrDefault(u => u.Id == GetCurrentUserId())!;
+        }
+
+        // big boios
         public ServiceResponse<string> Login(LoginUserDto request)
         {
             var response = new ServiceResponse<string>();
-            var user = _context.Users.FirstOrDefault(u => u.Username == request.Username);
-            if (user is null)
+            var user = _context.Users.FirstOrDefault(u => u.Username == request.UsernameOrEmail);
+            if(user is null)
             {
-                response.Success = false;
-                response.Message = "User not found";
-                return response;
+                user = _context.Users.FirstOrDefault(u => u.Email == request.UsernameOrEmail);
+                if(user is null)
+                {
+                    response.Success = false;
+                    response.Message = "No user with this username or email";
+                    return response;
+                }
             }
             if(VerifyPassword(request.Password, user.PasswordHash, user.PasswordSalt))
             {
@@ -71,6 +86,13 @@ namespace Login.Service.AuthService
                 response.Message = "Email is not valid";
                 return response;
             }
+            VoidServiceResponse passValid = PasswordIsValid(request.Password);
+            if(!passValid.Success)
+            {
+                response.Success = false;
+                response.Message = passValid.Message;
+                return response;
+            }
             CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwrodSalt);
             var user = new User
             {
@@ -87,10 +109,52 @@ namespace Login.Service.AuthService
             return response;
         }
 
+        public ServiceResponse<GetUserDto> ResetPasword(ResetUserPasswordDto request)
+        {
+            var response = new ServiceResponse<GetUserDto>();
+            var user = GetCurrentUser();
+            if(VerifyPassword(request.currentPassword, user!.PasswordHash, user.PasswordSalt))
+            {
+                CreatePasswordHash(request.NewPassword, out byte[] passwordHash, out byte[] passwrodSalt);
+                user.PasswordHash = passwordHash;
+                user.PasswordSalt = passwrodSalt;
+                _context.SaveChanges();
+                response.Message = "You have changed you password";
+                response.Data = _mapper.Map<GetUserDto>(user);
+                return response;
+            }
+            response.Success = false;
+            response.Message = "Please insert your old password to confirm identity n shit lol";
+            return response;
+        }
+        
+        public ServiceResponse<GetUserDto> ResetEmail(string email)
+        {
+            ServiceResponse<GetUserDto> response = new ServiceResponse<GetUserDto>();
+            User user = GetCurrentUser();
+            if(EmailExists(email))
+            {
+                response.Success = false;
+                response.Message = "Email Already In Use";
+                return response;
+            }
+            if(!EmailIsValid(email))
+            {
+                response.Success = false;
+                response.Message = "Email is not valid";
+                return response;
+            }
+            user.Email = email;
+            user.IsValidated = false;
+            _context.SaveChanges();
+            response.Message = "You have changed emails, try revalidating it with the code";
+            response.Data = _mapper.Map<GetUserDto>(user);
+            return response;
+        }
+
         public Task SendValidationEmail()
         {
-            int userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var user = _context.Users.FirstOrDefault(u => u.Id == userId);
+            var user = GetCurrentUser();
             string code = CreateRandomCode();
             user!.ValidationCode = code;
             _context.SaveChanges();
@@ -114,8 +178,7 @@ namespace Login.Service.AuthService
         public ServiceResponse<GetUserDto> EnterValidationCode(string code)
         {
             var response = new ServiceResponse<GetUserDto>();
-            int userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var user = _context.Users.FirstOrDefault(u => u.Id == userId);
+            var user = GetCurrentUser();
             if(code == user!.ValidationCode)
             {
                 user.IsValidated = true;
@@ -129,27 +192,7 @@ namespace Login.Service.AuthService
             response.Success = false;
             return response;
         }
-
-        public ServiceResponse<GetUserDto> ResetPasword(ResetUserPasswordDto request)
-        {
-            var response = new ServiceResponse<GetUserDto>();
-            int userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var user = _context.Users.FirstOrDefault(u => u.Id == userId);
-            if(VerifyPassword(request.currentPassword, user!.PasswordHash, user.PasswordSalt))
-            {
-                CreatePasswordHash(request.NewPassword, out byte[] passwordHash, out byte[] passwrodSalt);
-                user.PasswordHash = passwordHash;
-                user.PasswordSalt = passwrodSalt;
-                _context.SaveChanges();
-                response.Message = "You have changed you password";
-                response.Data = _mapper.Map<GetUserDto>(user);
-                return response;
-            }
-            response.Success = false;
-            response.Message = "Please insert your old password to confirm identity n shit lol";
-            return response;
-        }
-        // suporte
+        // suporte boios
         public bool UserExists(string username)
         {
             var user = _context.Users.FirstOrDefault(u => u.Username.ToLower() == username.ToLower());
@@ -175,6 +218,38 @@ namespace Login.Service.AuthService
             string pattern = @"^(?!\.)(""([^""\r\\]|\\[""\r\\])*""|" + @"([-a-z0-9!#$%&'*+/=?^_`{|}~]|(?<!\.)\.)*)(?<!\.)" + @"@[a-z0-9][\w\.-]*[a-z0-9]\.[a-z][a-z\.]*[a-z]$";    
             var regex = new Regex(pattern, RegexOptions.IgnoreCase);    
             return regex.IsMatch(email);
+        }
+
+        public VoidServiceResponse PasswordIsValid(string password)
+        {
+            var response = new VoidServiceResponse();
+            response.Message = "Invalid password. Your password must have letters, have numbers, be at least 8 characters long and not have any special characters. ";
+            if(password.Length < 8)
+            {
+                response.Success = false;
+                response.Message += "Your password is too short";
+                return response;
+            }
+            if(Regex.IsMatch(password , @"^[a-zA-Z]+$")) // só letra
+            {
+                response.Success = false;
+                response.Message += "It seems that your password only contains letters";
+                return response;
+            }
+            if(Regex.IsMatch(password, @"^[0-9]+$")) // so numero
+            {
+                response.Success = false;
+                response.Message += "It seems that your password only contains numbers";
+                return response;
+            }
+            if(!Regex.IsMatch(password, @"^[a-zA-Z0-9]+$")) // algo alem de letra e numero
+            {
+                response.Success = false;
+                response.Message += "It seems that you have used special characters";
+                return response;
+            }
+            response.Message = string.Empty;
+            return response;
         }
 
         public void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
@@ -221,6 +296,7 @@ namespace Login.Service.AuthService
             SecurityToken token = tokenHandler.CreateToken(tokenDescriptor);
             return tokenHandler.WriteToken(token);
         }
+
         public string CreateRandomCode()
         {
             Random r = new Random();
@@ -228,5 +304,6 @@ namespace Login.Service.AuthService
             string code = randomInt.ToString("D6");
             return code;
         }
+
     }
 }

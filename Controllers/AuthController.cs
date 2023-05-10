@@ -55,6 +55,18 @@ namespace Login.Controllers
         }
 
         [Authorize]
+        [HttpPost("Reset Email")]
+        public ActionResult<ServiceResponse<GetUserDto>> ResetEmail(string email)
+        {
+            var response = _authService.ResetEmail(email);
+            if(!response.Success)
+            {
+                return BadRequest(response);
+            }
+            return Ok(response);
+        }
+
+        [Authorize]
         [HttpPost("Send Validation Email")]
         public async Task<ActionResult> SendValidationEmail()
         {

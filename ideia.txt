@@ -23,4 +23,25 @@ MUDANÇA:
 	- Bem, achei q n fazia sentido deixar o ValidationCode salvo na database, ja q isso ia só ocupar espaço a toa pq ia ser usado só 1x e nunca mais basicamente, então agr vou excluir o validation code qnd for entrado o codigo de validação.
 	- Coloquei os [MaxLength] pra tenta usar menos espaço a toa na db. Nessa brincadeira eu decobri q o Entity usa como padrão o NVARCHAR ao invés de VARCHAR, n tinha a mais puta ideia de qual era a diferença. Em resumo, VARCHAR usa ASCII q usa 1byte(8bits) por caracter e NVARCHAR usar 2bytes(16bits) por caracter e custa o dobro pq ele consegue ser usado pra qualquer língua, mas acho q o projeto não vai precisar ser traduzido pra swahili kkkkk, então seria melhor economizar espaço usando o VARCHAR msm. 
 	Deixei role com 3 caracteres, já que são só 3, da pra usar, por ex: adm, clb e fnc.
-
+	- Mudei o register pra aceitar só senha e email válidos.
+	- Mudei o login pra consguir logar com username ou email.
+	- Coloquei um reset email, ai tem q revalidar o email.
+public class User		<-- User novo                                                                                                                                                                                                                                                                             
+{
+	public int Id {get;set;}
+	[Unicode(false)]
+	[MaxLength(50)]
+	public string Username {get;set;} = string.Empty;
+	[Unicode(false)]
+	[MaxLength(254)]
+	public string Email { get; set; } = string.Empty;
+	public byte[] PasswordHash {get;set;} = new byte[0];
+	public byte[] PasswordSalt {get;set;} = new byte[0];
+	[Unicode(false)]
+	[MaxLength(3)]
+	public string Role { get; set; } = string.Empty;
+	[Unicode(false)]
+	[MaxLength(6)]
+	public string ValidationCode { get; set; } = string.Empty;
+	public bool IsValidated { get; set; } = false;
+}
