@@ -28,7 +28,7 @@ namespace Login.Service.AuthService
             _mapper = mapper;
             _httpContext = httpContext;
         }
-
+        // big boy
         public ServiceResponse<string> Login(LoginUserDto request)
         {
             var response = new ServiceResponse<string>();
@@ -87,12 +87,55 @@ namespace Login.Service.AuthService
             return response;
         }
 
+        public Task SendValidationEmail()
+        {
+            int userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = _context.Users.FirstOrDefault(u => u.Id == userId);
+            string code = CreateRandomCode();
+            user!.ValidationCode = code;
+            _context.SaveChanges();
+            string receiver = user!.Email;
+            string subject = "Email validation code";
+            string message = $"Insert the code {code} to validate your email";
+            var client = new SmtpClient("smtp.office365.com", 587)
+            {
+                EnableSsl = true,
+                UseDefaultCredentials = false,
+                Credentials = new NetworkCredential("pedroarthurcosta@hotmail.com", "bmnsslihacpmasbc")
+            };
+            return client.SendMailAsync( new MailMessage(
+                from: "pedroarthurcosta@hotmail.com",
+                to: receiver,
+                subject,
+                message
+            ));
+        }
+
+        public ServiceResponse<GetUserDto> EnterValidationCode(string code)
+        {
+            var response = new ServiceResponse<GetUserDto>();
+            int userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = _context.Users.FirstOrDefault(u => u.Id == userId);
+            if(code == user!.ValidationCode)
+            {
+                user.IsValidated = true;
+                user.ValidationCode = string.Empty;
+                _context.SaveChanges();
+                response.Message = "Your email has been validated";
+                response.Data = _mapper.Map<GetUserDto>(user);
+                return response;
+            }
+            response.Message = "This is the wrong code";
+            response.Success = false;
+            return response;
+        }
+
         public ServiceResponse<GetUserDto> ResetPasword(ResetUserPasswordDto request)
         {
             var response = new ServiceResponse<GetUserDto>();
             int userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var user = _context.Users.FirstOrDefault(u => u.Id == userId);
-            if(VerifyPassword(request.currentPassword, user.PasswordHash, user.PasswordSalt))
+            if(VerifyPassword(request.currentPassword, user!.PasswordHash, user.PasswordSalt))
             {
                 CreatePasswordHash(request.NewPassword, out byte[] passwordHash, out byte[] passwrodSalt);
                 user.PasswordHash = passwordHash;
@@ -106,7 +149,7 @@ namespace Login.Service.AuthService
             response.Message = "Please insert your old password to confirm identity n shit lol";
             return response;
         }
-
+        // suporte
         public bool UserExists(string username)
         {
             var user = _context.Users.FirstOrDefault(u => u.Username.ToLower() == username.ToLower());
@@ -184,47 +227,6 @@ namespace Login.Service.AuthService
             int randomInt = r.Next(1000000);
             string code = randomInt.ToString("D6");
             return code;
-        }
-
-        public Task SendValidationEmail()
-        {
-            int userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var user = _context.Users.FirstOrDefault(u => u.Id == userId);
-            string code = CreateRandomCode();
-            user!.ValidationCode = code;
-            _context.SaveChanges();
-            string receiver = user!.Email;
-            string subject = "Email validation code";
-            string message = $"Insert the code {code} to validate your email";
-            var client = new SmtpClient("smtp.office365.com", 587)
-            {
-                EnableSsl = true,
-                UseDefaultCredentials = false,
-                Credentials = new NetworkCredential("pedroarthurcosta@hotmail.com", "bmnsslihacpmasbc")
-            };
-            return client.SendMailAsync( new MailMessage(
-                from: "pedroarthurcosta@hotmail.com",
-                to: receiver,
-                subject,
-                message
-            ));
-        }
-
-        public ServiceResponse<GetUserDto> EnterValidationCode(string code)
-        {
-            var response = new ServiceResponse<GetUserDto>();
-            int userId = int.Parse(_httpContext.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var user = _context.Users.FirstOrDefault(u => u.Id == userId);
-            if(code == user!.ValidationCode)
-            {
-                user.IsValidated = true;
-                response.Message = "Your email has been validated";
-                response.Data = _mapper.Map<GetUserDto>(user);
-                return response;
-            }
-            response.Message = "This is the wrong code";
-            response.Success = false;
-            return response;
         }
     }
 }
